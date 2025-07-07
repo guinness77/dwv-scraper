@@ -1,3 +1,8 @@
+ // Direct HTTP calls to Supabase Edge Functions
+ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+ const functionsBaseUrl = `${supabaseUrl}/functions/v1`;
+
 import { supabase } from './supabase';
 import { Property } from '../types/property';
 
@@ -107,16 +112,19 @@ export class PropertySearchService {
 
   private async scrapeUrl(url: string): Promise<Property[]> {
     try {
-      const { data, error } = await supabase.functions.invoke('scrape-properties', {
-        body: { url }
+      const response = await fetch(`${functionsBaseUrl}/scrape-properties`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ url })
       });
-      
-      if (error) {
-        console.error('Erro na função de scraping:', error);
-        return [];
+      if (!response.ok) {
+        throw new Error(`Edge Function request failed: ${response.status} ${response.statusText}`);
       }
-      
-      return data?.properties || [];
+      const data = await response.json();
+      return data.properties || [];
     } catch (error) {
       console.error('Erro no scraping:', error);
       return [];

@@ -1,3 +1,8 @@
+ // Direct HTTP calls to Supabase Edge Functions
+ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+ const functionsBaseUrl = `${supabaseUrl}/functions/v1`;
+
 import { supabase } from './supabase';
 import { Property } from '../types/property';
 
@@ -13,22 +18,19 @@ export class DWVAppService {
   async scrapeDWVApp(): Promise<ScrapingResult> {
     try {
       console.log('Iniciando scraping do DWV App...');
-      
-      const { data, error } = await supabase.functions.invoke('scrape-dwv-app');
-      
-      if (error) {
-        console.error('Erro na função de scraping do DWV App:', error);
-        return {
-          success: false,
-          properties: [],
-          total_found: 0,
-          error: error.message || 'Erro ao executar a função de scraping'
-        };
+      const response = await fetch(`${functionsBaseUrl}/scrape-dwv-app`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`Edge Function request failed: ${response.status} ${response.statusText}`);
       }
-      
-      const properties = data?.properties || [];
+      const data = await response.json();
+      const properties = data.properties || [];
       console.log(`DWV App scraping concluído: ${properties.length} propriedades encontradas`);
-      
       return {
         success: true,
         properties,

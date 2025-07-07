@@ -1,4 +1,8 @@
-import { supabase } from './supabase';
+
+ // Direct HTTP calls to Supabase Edge Functions for authentication
+ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+ const functionsBaseUrl = `${supabaseUrl}/functions/v1`;
 
 interface AuthTestResult {
   success: boolean;
@@ -11,15 +15,17 @@ interface AuthTestResult {
 export class DWVAuthService {
   async testAuthentication(): Promise<AuthTestResult> {
     try {
-      console.log('Testando autenticação no DWV App...');
-      
-      const { data, error } = await supabase.functions.invoke('test-dwv-auth');
-      
-      if (error) {
-        console.error('Erro na função de teste de autenticação:', error);
-        throw error;
+      const response = await fetch(`${functionsBaseUrl}/test-dwv-auth`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`Edge Function request failed: ${response.status} ${response.statusText}`);
       }
-      
+      const data = await response.json();
       return data as AuthTestResult;
     } catch (error) {
       console.error('Erro no teste de autenticação:', error);
