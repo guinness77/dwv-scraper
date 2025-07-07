@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { Building2, Database, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Building2, Database, Loader2, AlertCircle, CheckCircle, Shield } from 'lucide-react';
 import { PropertyForm } from './components/PropertyForm';
 import { PropertyCard } from './components/PropertyCard';
 import { PropertyStats } from './components/PropertyStats';
 import { PropertyFilters } from './components/PropertyFilters';
 import { AutoSearchPanel } from './components/AutoSearchPanel';
 import { DWVAppPanel } from './components/DWVAppPanel';
+import { DWVAuthTest } from './components/DWVAuthTest';
 import { useProperties } from './hooks/useProperties';
 
 function App() {
@@ -15,7 +16,7 @@ function App() {
   const [filterBy, setFilterBy] = useState('all');
   const [scrapingStatus, setScrapingStatus] = useState<'idle' | 'scraping' | 'success' | 'error'>('idle');
   const [scrapingMessage, setScrapingMessage] = useState('');
-  const [activeTab, setActiveTab] = useState<'dwv' | 'auto' | 'manual'>('dwv');
+  const [activeTab, setActiveTab] = useState<'dwv' | 'auto' | 'manual' | 'test'>('test');
 
   const filteredAndSortedProperties = useMemo(() => {
     let filtered = properties;
@@ -147,6 +148,19 @@ function App() {
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
               <button
+                onClick={() => setActiveTab('test')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'test'
+                    ? 'border-green-500 text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center">
+                  <Shield className="w-4 h-4 mr-1" />
+                  Teste de Autenticação
+                </div>
+              </button>
+              <button
                 onClick={() => setActiveTab('dwv')}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'dwv'
@@ -181,6 +195,7 @@ function App() {
         </div>
 
         {/* Tab Content */}
+        {activeTab === 'test' && <DWVAuthTest />}
         {activeTab === 'dwv' && <DWVAppPanel />}
         {activeTab === 'auto' && <AutoSearchPanel />}
         {activeTab === 'manual' && (

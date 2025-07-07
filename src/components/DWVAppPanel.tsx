@@ -7,6 +7,7 @@ export const DWVAppPanel: React.FC = () => {
   const [extractionStatus, setExtractionStatus] = useState<'idle' | 'extracting' | 'success' | 'error'>('idle');
   const [extractionMessage, setExtractionMessage] = useState('');
   const [lastExtractionResults, setLastExtractionResults] = useState<number>(0);
+  const [lastSavedResults, setLastSavedResults] = useState<number>(0);
 
   const handleDWVExtraction = async () => {
     setIsExtracting(true);
@@ -14,21 +15,17 @@ export const DWVAppPanel: React.FC = () => {
     setExtractionMessage('Fazendo login no DWV App e extraindo imóveis...');
 
     try {
-      // Extract properties from DWV App
-      const properties = await dwvAppService.scrapeDWVApp();
+      // Extract and save properties from DWV App
+      const result = await dwvAppService.scrapeAndSaveDWVProperties();
       
-      if (properties.length > 0) {
-        // Save new properties to database
-        const savedProperties = await dwvAppService.saveNewDWVProperties(properties);
-        
-        setLastExtractionResults(savedProperties.length);
+      if (result.success) {
+        setLastExtractionResults(result.properties.length);
+        setLastSavedResults(result.total_found);
         setExtractionStatus('success');
-        setExtractionMessage(
-          `${properties.length} imóveis extraídos do DWV App. ${savedProperties.length} novos imóveis salvos no banco de dados!`
-        );
+        setExtractionMessage(result.message || `${result.properties.length} imóveis extraídos do DWV App.`);
       } else {
         setExtractionStatus('error');
-        setExtractionMessage('Nenhum imóvel encontrado no DWV App. Verifique as credenciais ou tente novamente.');
+        setExtractionMessage(result.error || 'Erro ao extrair imóveis do DWV App.');
       }
 
       setTimeout(() => {
@@ -147,11 +144,11 @@ export const DWVAppPanel: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
           <div>
             <div className="text-2xl font-bold text-blue-600">{lastExtractionResults}</div>
-            <div className="text-sm text-gray-600">Últimos resultados</div>
+            <div className="text-sm text-gray-600">Imóveis encontrados</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-emerald-600">ATIVO</div>
-            <div className="text-sm text-gray-600">Status da conta</div>
+            <div className="text-2xl font-bold text-emerald-600">{lastSavedResults}</div>
+            <div className="text-sm text-gray-600">Novos imóveis salvos</div>
           </div>
           <div>
             <div className="text-2xl font-bold text-purple-600">DWV App</div>

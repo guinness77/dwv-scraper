@@ -1,8 +1,16 @@
 import { supabase } from './supabase';
 import { Property } from '../types/property';
 
+export interface ScrapingResult {
+  success: boolean;
+  properties: Property[];
+  total_found: number;
+  message?: string;
+  error?: string;
+}
+
 export class DWVAppService {
-  async scrapeDWVApp(): Promise<Property[]> {
+  async scrapeDWVApp(): Promise<ScrapingResult> {
     try {
       console.log('Iniciando scraping do DWV App...');
       
@@ -10,22 +18,44 @@ export class DWVAppService {
       
       if (error) {
         console.error('Erro na função de scraping do DWV App:', error);
-        throw error;
+        return {
+          success: false,
+          properties: [],
+          total_found: 0,
+          error: error.message || 'Erro ao executar a função de scraping'
+        };
       }
       
       const properties = data?.properties || [];
       console.log(`DWV App scraping concluído: ${properties.length} propriedades encontradas`);
       
-      return properties;
+      return {
+        success: true,
+        properties,
+        total_found: properties.length,
+        message: `${properties.length} propriedades encontradas no DWV App`
+      };
     } catch (error) {
       console.error('Erro no scraping do DWV App:', error);
-      throw error;
+      return {
+        success: false,
+        properties: [],
+        total_found: 0,
+        error: error instanceof Error ? error.message : 'Erro desconhecido no scraping'
+      };
     }
   }
 
-  async saveNewDWVProperties(properties: Property[]): Promise<Property[]> {
+  async saveNewDWVProperties(properties: Property[]): Promise<ScrapingResult> {
     try {
-      if (properties.length === 0) return [];
+      if (properties.length === 0) {
+        return {
+          success: true,
+          properties: [],
+          total_found: 0,
+          message: 'Nenhuma propriedade para salvar'
+        };
+      }
 
       // Check for existing properties to avoid duplicates
       const existingTitles = await this.getExistingTitles(properties.map(p => p.title));
@@ -33,7 +63,12 @@ export class DWVAppService {
 
       if (newProperties.length === 0) {
         console.log('Nenhuma propriedade nova do DWV App para salvar');
-        return [];
+        return {
+          success: true,
+          properties: [],
+          total_found: 0,
+          message: 'Nenhuma propriedade nova para salvar (todas já existem no banco)'
+        };
       }
 
       const { data, error } = await supabase
@@ -43,19 +78,66 @@ export class DWVAppService {
 
       if (error) {
         console.error('Erro ao salvar propriedades do DWV App:', error);
-        throw error;
+        return {
+          success: false,
+          properties: [],
+          total_found: 0,
+          error: error.message || 'Erro ao salvar propriedades no banco de dados'
+        };
       }
 
       console.log(`${newProperties.length} novas propriedades do DWV App salvas`);
-      return data || [];
+      return {
+        success: true,
+        properties: data || [],
+        total_found: data?.length || 0,
+        message: `${newProperties.length} novas propriedades salvas com sucesso`
+      };
     } catch (error) {
       console.error('Erro ao salvar propriedades do DWV App:', error);
-      throw error;
+      return {
+        success: false,
+        properties: [],
+        total_found: 0,
+        error: error instanceof Error ? error.message : 'Erro desconhecido ao salvar propriedades'
+      };
+    }
+  }
+
+  async scrapeAndSaveDWVProperties(): Promise<ScrapingResult> {
+    try {
+      // Step 1: Scrape properties
+      const scrapingResult = await this.scrapeDWVApp();
+      
+      if (!scrapingResult.success || scrapingResult.properties.length === 0) {
+        return scrapingResult;
+      }
+      
+      // Step 2: Save new properties
+      const savingResult = await this.saveNewDWVProperties(scrapingResult.properties);
+      
+      // Return combined result
+      return {
+        success: savingResult.success,
+        properties: scrapingResult.properties,
+        total_found: scrapingResult.total_found,
+        message: `${scrapingResult.total_found} propriedades encontradas, ${savingResult.total_found} novas salvas no banco`
+      };
+    } catch (error) {
+      console.error('Erro no processo de scraping e salvamento:', error);
+      return {
+        success: false,
+        properties: [],
+        total_found: 0,
+        error: error instanceof Error ? error.message : 'Erro no processo de scraping e salvamento'
+      };
     }
   }
 
   private async getExistingTitles(titles: string[]): Promise<string[]> {
     try {
+      if (!titles || titles.length === 0) return [];
+      
       const { data, error } = await supabase
         .from('properties')
         .select('title')

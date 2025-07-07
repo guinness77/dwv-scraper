@@ -1,0 +1,87 @@
+# Supabase Configuration for Production
+# This file contains the configuration for the Supabase project
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 15
+max_client_conn = 100
+
+[realtime]
+enabled = true
+port = 54323
+
+[studio]
+enabled = true
+port = 54323
+api_url = "https://api.supabase.com"
+
+[inbucket]
+enabled = true
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+port = 54324
+site_url = "https://your-domain.com"
+additional_redirect_urls = ["https://your-domain.com/auth/callback"]
+jwt_expiry = 3600
+refresh_token_rotation_enabled = true
+security_update_password_require_reauthentication = true
+
+[edge_runtime]
+enabled = true
+port = 54325
+
+[analytics]
+enabled = false
+
+[experimental]
+enable_realtime = true
+
+# Production-specific settings
+[production]
+# Enable all security features
+enable_row_level_security = true
+enable_realtime = true
+enable_storage = true
+
+# Database settings
+max_connections = 100
+shared_preload_libraries = ["pg_stat_statements", "pg_graphql"]
+
+# Edge Functions settings
+functions_timeout = 60
+functions_memory_limit = "512MiB"
+
+# Monitoring and logging
+enable_logging = true
+log_level = "info"
+
+# Backup settings
+backup_enabled = true
+backup_retention_days = 30
+
+# Security settings
+enable_ssl = true
+enable_encryption_at_rest = true
+enable_audit_logging = true 

@@ -1,0 +1,76 @@
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.png"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.jpg"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.svg"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[functions]
+  directory = "netlify/functions"
+
+[dev]
+  command = "npm run dev"
+  port = 3000
+  publish = "dist"
+  framework = "#custom"
+
+[context.production.environment]
+  VITE_SUPABASE_URL = "https://your-production-project.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "your-production-anon-key"
+
+[context.deploy-preview.environment]
+  VITE_SUPABASE_URL = "https://your-staging-project.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "your-staging-anon-key"
+
+[context.branch-deploy.environment]
+  VITE_SUPABASE_URL = "https://your-staging-project.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "your-staging-anon-key" 
