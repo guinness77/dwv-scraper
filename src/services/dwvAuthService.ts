@@ -15,6 +15,7 @@ interface AuthTestResult {
 export class DWVAuthService {
   async testAuthentication(): Promise<AuthTestResult> {
     try {
++        console.log('DEBUG functionsBaseUrl (auth):', functionsBaseUrl);
       const response = await fetch(`${functionsBaseUrl}/test-dwv-auth`, {
         method: 'GET',
         headers: {

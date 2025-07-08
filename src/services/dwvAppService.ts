@@ -18,6 +18,7 @@ export class DWVAppService {
   async scrapeDWVApp(): Promise<ScrapingResult> {
     try {
       console.log('Iniciando scraping do DWV App...');
+      console.log('DEBUG functionsBaseUrl (app):', functionsBaseUrl);
       const response = await fetch(`${functionsBaseUrl}/scrape-dwv-app`, {
         method: 'GET',
         headers: {

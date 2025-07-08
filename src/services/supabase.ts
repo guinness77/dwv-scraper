@@ -3,6 +3,8 @@ import { Property } from '../types/property';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+console.log('DEBUG Supabase URL:', supabaseUrl);
+console.log('DEBUG Supabase Anon Key:', supabaseKey);
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 

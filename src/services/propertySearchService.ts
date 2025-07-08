@@ -112,6 +112,7 @@ export class PropertySearchService {
 
   private async scrapeUrl(url: string): Promise<Property[]> {
     try {
+      console.log('DEBUG functionsBaseUrl (search):', functionsBaseUrl, 'url:', url);
       const response = await fetch(`${functionsBaseUrl}/scrape-properties`, {
         method: 'POST',
         headers: {
