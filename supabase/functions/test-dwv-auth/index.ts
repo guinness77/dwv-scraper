@@ -1,5 +1,5 @@
 import { corsHeaders } from '../_shared/cors.ts';
-import { createAuthManager, DWVCredentials } from '../_shared/dwv-auth-manager.ts';
+import { createEnhancedAuth, DWVCredentials } from '../_shared/dwv-enhanced-auth.ts';
 
 // Get credentials from environment variables
 const DWV_CREDENTIALS: DWVCredentials = {
@@ -18,9 +18,10 @@ Deno.serve(async (req: Request) => {
 
   try {
     console.log('🔐 Starting enhanced DWV authentication test...');
+    console.log(`📧 Testing with email: ${DWV_CREDENTIALS.email}`);
     
-    // Create authentication manager
-    const authManager = createAuthManager(DWV_CREDENTIALS);
+    // Create enhanced authentication manager
+    const authManager = createEnhancedAuth(DWV_CREDENTIALS);
     
     // Attempt authentication
     const authResult = await authManager.authenticate();
@@ -39,7 +40,13 @@ Deno.serve(async (req: Request) => {
       redirectLocation: authResult.redirectLocation || null,
       sessionId: authResult.sessionId || null,
       timestamp: new Date().toISOString(),
-      headers: authResult.headers ? Object.keys(authResult.headers) : null
+      headers: authResult.headers ? Object.keys(authResult.headers) : null,
+      // Additional debug info
+      debug: {
+        credentials_configured: !!(DWV_CREDENTIALS.email && DWV_CREDENTIALS.password),
+        email_used: DWV_CREDENTIALS.email,
+        site_url: 'https://app.dwvapp.com.br'
+      }
     };
     
     return new Response(
@@ -55,7 +62,12 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({ 
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        debug: {
+          credentials_configured: !!(DWV_CREDENTIALS.email && DWV_CREDENTIALS.password),
+          email_used: DWV_CREDENTIALS.email,
+          site_url: 'https://app.dwvapp.com.br'
+        }
       }),
       {
         status: 500,

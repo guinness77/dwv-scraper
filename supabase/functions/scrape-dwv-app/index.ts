@@ -1,6 +1,6 @@
 import { corsHeaders } from '../_shared/cors.ts';
-import { createAuthManager, DWVCredentials } from '../_shared/dwv-auth-manager.ts';
-import { createScraper } from '../_shared/dwv-scraper.ts';
+import { createEnhancedAuth, DWVCredentials } from '../_shared/dwv-enhanced-auth.ts';
+import { createPropertyExtractor } from '../_shared/dwv-property-extractor.ts';
 
 // Get credentials from environment variables
 const DWV_CREDENTIALS: DWVCredentials = {
@@ -19,10 +19,11 @@ Deno.serve(async (req: Request) => {
 
   try {
     console.log('🏠 Starting enhanced DWV property scraping...');
+    console.log(`📧 Using email: ${DWV_CREDENTIALS.email}`);
     
     // Step 1: Authenticate
     console.log('🔐 Authenticating with DWV App...');
-    const authManager = createAuthManager(DWV_CREDENTIALS);
+    const authManager = createEnhancedAuth(DWV_CREDENTIALS);
     const authResult = await authManager.authenticate();
     
     if (!authResult.success) {
@@ -31,26 +32,32 @@ Deno.serve(async (req: Request) => {
     
     console.log(`✅ Authentication successful using method: ${authResult.method}`);
     
-    // Step 2: Scrape properties
+    // Step 2: Extract properties
     console.log('🔍 Starting property extraction...');
-    const scraper = createScraper(authResult.cookies!);
-    const scrapingResult = await scraper.scrapeProperties();
+    const extractor = createPropertyExtractor(authResult.cookies!);
+    const extractionResult = await extractor.extractProperties();
     
-    if (!scrapingResult.success) {
-      throw new Error(`Scraping failed: ${scrapingResult.error}`);
+    if (!extractionResult.success) {
+      throw new Error(`Property extraction failed: ${extractionResult.error}`);
     }
     
-    console.log(`✅ Scraping completed: ${scrapingResult.properties.length} properties found`);
+    console.log(`✅ Extraction completed: ${extractionResult.properties.length} properties found`);
     
     // Step 3: Return results
     const response = {
       success: true,
-      properties: scrapingResult.properties,
-      total_found: scrapingResult.total_found,
-      message: scrapingResult.message,
-      source: scrapingResult.source,
+      properties: extractionResult.properties,
+      total_found: extractionResult.total_found,
+      message: extractionResult.message,
+      source: extractionResult.source,
       auth_method: authResult.method,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      debug: {
+        credentials_configured: !!(DWV_CREDENTIALS.email && DWV_CREDENTIALS.password),
+        email_used: DWV_CREDENTIALS.email,
+        site_url: 'https://app.dwvapp.com.br',
+        extraction_strategies: ['API Endpoints', 'HTML Pages', 'Dashboard Area']
+      }
     };
     
     return new Response(
@@ -69,7 +76,12 @@ Deno.serve(async (req: Request) => {
         error: error.message,
         properties: [],
         total_found: 0,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        debug: {
+          credentials_configured: !!(DWV_CREDENTIALS.email && DWV_CREDENTIALS.password),
+          email_used: DWV_CREDENTIALS.email,
+          site_url: 'https://app.dwvapp.com.br'
+        }
       }),
       {
         status: 500,
