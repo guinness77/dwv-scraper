@@ -64,15 +64,47 @@ validate_supabase_project() {
 deploy_functions() {
     print_status "Deploying Supabase Edge Functions..."
     
+    # Check if functions directory exists
+    if [ ! -d "supabase/functions" ]; then
+        print_error "supabase/functions directory not found"
+        exit 1
+    fi
+    
+    # List available functions
+    print_status "Available functions:"
+    for func_dir in supabase/functions/*/; do
+        if [ -d "$func_dir" ] && [ -f "$func_dir/index.ts" ]; then
+            func_name=$(basename "$func_dir")
+            echo "  - $func_name"
+        fi
+    done
+    
     # Deploy test-dwv-auth function
-    print_status "Deploying test-dwv-auth function..."
-    supabase functions deploy test-dwv-auth
-    print_success "test-dwv-auth function deployed successfully"
+    if [ -d "supabase/functions/test-dwv-auth" ] && [ -f "supabase/functions/test-dwv-auth/index.ts" ]; then
+        print_status "Deploying test-dwv-auth function..."
+        supabase functions deploy test-dwv-auth
+        print_success "test-dwv-auth function deployed successfully"
+    else
+        print_warning "test-dwv-auth function not found, skipping..."
+    fi
     
     # Deploy scrape-dwv-app function
-    print_status "Deploying scrape-dwv-app function..."
-    supabase functions deploy scrape-dwv-app
-    print_success "scrape-dwv-app function deployed successfully"
+    if [ -d "supabase/functions/scrape-dwv-app" ] && [ -f "supabase/functions/scrape-dwv-app/index.ts" ]; then
+        print_status "Deploying scrape-dwv-app function..."
+        supabase functions deploy scrape-dwv-app
+        print_success "scrape-dwv-app function deployed successfully"
+    else
+        print_warning "scrape-dwv-app function not found, skipping..."
+    fi
+    
+    # Deploy scrape-properties function
+    if [ -d "supabase/functions/scrape-properties" ] && [ -f "supabase/functions/scrape-properties/index.ts" ]; then
+        print_status "Deploying scrape-properties function..."
+        supabase functions deploy scrape-properties
+        print_success "scrape-properties function deployed successfully"
+    else
+        print_warning "scrape-properties function not found, skipping..."
+    fi
 }
 
 # Function to set environment variables

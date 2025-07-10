@@ -124,10 +124,15 @@ deploy_supabase() {
     print_status "Deploying Supabase backend..."
     
     # Check if Supabase project is linked
-    if [ -z "$SUPABASE_PROJECT_REF" ]; then
-        print_warning "SUPABASE_PROJECT_REF not set. Please link your Supabase project first:"
-        print_warning "supabase link --project-ref YOUR_PROJECT_REF"
-        exit 1
+    if ! supabase status &> /dev/null; then
+        if [ -z "$SUPABASE_PROJECT_REF" ]; then
+            print_warning "SUPABASE_PROJECT_REF not set. Please link your Supabase project first:"
+            print_warning "supabase link --project-ref YOUR_PROJECT_REF"
+            exit 1
+        else
+            print_status "Linking Supabase project..."
+            supabase link --project-ref "$SUPABASE_PROJECT_REF"
+        fi
     fi
     
     # Apply database migrations
@@ -136,9 +141,29 @@ deploy_supabase() {
     
     # Deploy Edge Functions
     print_status "Deploying Edge Functions..."
-    supabase functions deploy test-dwv-auth
-    supabase functions deploy scrape-dwv-app
-    supabase functions deploy scrape-properties
+    
+    # Check if functions directory exists
+    if [ ! -d "supabase/functions" ]; then
+        print_error "supabase/functions directory not found"
+        exit 1
+    fi
+    
+    # Deploy each function if it exists
+    for func_dir in supabase/functions/*/; do
+        if [ -d "$func_dir" ] && [ -f "$func_dir/index.ts" ]; then
+            func_name=$(basename "$func_dir")
+            # Skip configuration files and shared directories
+            if [[ "$func_name" != "_shared" && "$func_name" != "deno.json" && "$func_name" != "import_map.json" ]]; then
+                print_status "Deploying $func_name function..."
+                if supabase functions deploy "$func_name"; then
+                    print_success "$func_name function deployed successfully"
+                else
+                    print_error "Failed to deploy $func_name function"
+                    exit 1
+                fi
+            fi
+        fi
+    done
     
     print_success "Supabase backend deployed successfully"
 }
