@@ -23,15 +23,32 @@ Deno.serve(async (req: Request) => {
 
   try {
     console.log('🤖 Starting DWV background process...');
+    console.log('📊 Environment check:', {
+      hasEmail: !!DWV_CREDENTIALS.email,
+      hasPassword: !!DWV_CREDENTIALS.password,
+      hasSupabaseUrl: !!SUPABASE_CONFIG.url,
+      hasServiceKey: !!SUPABASE_CONFIG.serviceKey,
+      email: DWV_CREDENTIALS.email ? DWV_CREDENTIALS.email.substring(0, 5) + '***' : 'MISSING'
+    });
     
     // Validate configuration
     if (!DWV_CREDENTIALS.email || !DWV_CREDENTIALS.password) {
+      console.error('❌ DWV credentials missing:', {
+        email: !!DWV_CREDENTIALS.email,
+        password: !!DWV_CREDENTIALS.password
+      });
       throw new Error('DWV credentials not configured');
     }
     
     if (!SUPABASE_CONFIG.url || !SUPABASE_CONFIG.serviceKey) {
+      console.error('❌ Supabase config missing:', {
+        url: !!SUPABASE_CONFIG.url,
+        serviceKey: !!SUPABASE_CONFIG.serviceKey
+      });
       throw new Error('Supabase configuration not found');
     }
+    
+    console.log('✅ Configuration validated successfully');
     
     // Create process configuration
     const config: ProcessConfig = {
@@ -45,9 +62,20 @@ Deno.serve(async (req: Request) => {
       }
     };
     
+    console.log('🔧 Creating background processor...');
+    
     // Create and execute background processor
     const processor = createBackgroundProcessor(config);
+    
+    console.log('▶️ Executing background process...');
     const result = await processor.executeProcess();
+    
+    console.log('📋 Process result:', {
+      success: result.success,
+      propertiesExtracted: result.propertiesExtracted,
+      propertiesSaved: result.propertiesSaved,
+      hasError: !!result.error
+    });
     
     // Prepare response
     const response = {
