@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Building2, Database, Loader2, AlertCircle, CheckCircle, Shield } from 'lucide-react';
+import { Building2, Database, Loader2, AlertCircle, CheckCircle, Shield, Bot } from 'lucide-react';
 import { PropertyForm } from './components/PropertyForm';
 import { PropertyCard } from './components/PropertyCard';
 import { PropertyStats } from './components/PropertyStats';
@@ -7,6 +7,7 @@ import { PropertyFilters } from './components/PropertyFilters';
 import { AutoSearchPanel } from './components/AutoSearchPanel';
 import { DWVAppPanel } from './components/DWVAppPanel';
 import { DWVAuthTest } from './components/DWVAuthTest';
+import { BackgroundProcessPanel } from './components/BackgroundProcessPanel';
 import { useProperties } from './hooks/useProperties';
 
 function App() {
@@ -16,7 +17,7 @@ function App() {
   const [filterBy, setFilterBy] = useState('all');
   const [scrapingStatus, setScrapingStatus] = useState<'idle' | 'scraping' | 'success' | 'error'>('idle');
   const [scrapingMessage, setScrapingMessage] = useState('');
-  const [activeTab, setActiveTab] = useState<'dwv' | 'auto' | 'manual' | 'test'>('test');
+  const [activeTab, setActiveTab] = useState<'background' | 'dwv' | 'auto' | 'manual' | 'test'>('test');
 
   const filteredAndSortedProperties = useMemo(() => {
     let filtered = properties;
@@ -148,6 +149,19 @@ function App() {
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
               <button
+                onClick={() => setActiveTab('background')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'background'
+                    ? 'border-purple-500 text-purple-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center">
+                  <Bot className="w-4 h-4 mr-1" />
+                  Processo Automatizado
+                </div>
+              </button>
+              <button
                 onClick={() => setActiveTab('test')}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'test'
@@ -195,6 +209,7 @@ function App() {
         </div>
 
         {/* Tab Content */}
+        {activeTab === 'background' && <BackgroundProcessPanel />}
         {activeTab === 'test' && <DWVAuthTest />}
         {activeTab === 'dwv' && <DWVAppPanel />}
         {activeTab === 'auto' && <AutoSearchPanel />}
