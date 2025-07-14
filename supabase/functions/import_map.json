@@ -1,6 +1,8 @@
 {
   "imports": {
     "std/": "https://deno.land/std@0.177.0/",
-    "deno/": "https://deno.land/x/deno@v1.32.4/"
+    "deno/": "https://deno.land/x/deno@v1.32.4/",
+    "puppeteer": "https://esm.sh/puppeteer-core@19.11.1",
+    "puppeteer-core": "https://esm.sh/puppeteer-core@19.11.1"
   }
 }

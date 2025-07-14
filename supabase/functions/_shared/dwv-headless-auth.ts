@@ -1,7 +1,11 @@
 /**
  * Headless Browser Authentication for DWV App
- * Uses browser automation techniques within Deno Edge Functions
+ * Uses Puppeteer for real browser automation to handle JavaScript-driven authentication
  */
+
+// Hybrid authentication approach - Puppeteer with HTTP fallback
+// Import enhanced auth as fallback
+import { createEnhancedAuth } from './dwv-enhanced-auth.ts';
 
 export interface DWVCredentials {
   email: string;
@@ -26,7 +30,6 @@ export interface AuthResult {
 export class HeadlessDWVAuth {
   private credentials: DWVCredentials;
   private baseUrl = 'https://app.dwvapp.com.br';
-  private userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
   private sessionStore: Map<string, AuthSession> = new Map();
 
   constructor(credentials: DWVCredentials) {
@@ -34,10 +37,10 @@ export class HeadlessDWVAuth {
   }
 
   /**
-   * Main authentication method with browser simulation
+   * Main authentication method with hybrid approach (Puppeteer + HTTP fallback)
    */
   async authenticate(): Promise<AuthResult> {
-    console.log('🤖 Starting headless browser authentication...');
+    console.log('🤖 Starting hybrid authentication (Puppeteer with HTTP fallback)...');
     
     try {
       // Check for existing valid session
@@ -51,25 +54,51 @@ export class HeadlessDWVAuth {
         };
       }
 
-      // Step 1: Initialize browser session
-      const browserSession = await this.initializeBrowserSession();
+      // Try Puppeteer first, fallback to HTTP if it fails
+      try {
+        console.log('🌐 Attempting Puppeteer authentication...');
+        const puppeteerResult = await this.performPuppeteerLogin();
+        
+        if (puppeteerResult.success && puppeteerResult.session) {
+          this.storeSession(puppeteerResult.session);
+          console.log('✅ Puppeteer authentication successful');
+          return puppeteerResult;
+        }
+      } catch (puppeteerError) {
+        console.warn('⚠️ Puppeteer failed, falling back to HTTP authentication:', puppeteerError.message);
+      }
+
+      // Fallback to enhanced HTTP authentication
+      console.log('🔄 Falling back to enhanced HTTP authentication...');
+      const httpResult = await this.performHttpFallback();
       
-      // Step 2: Navigate to login page
-      const loginPageData = await this.navigateToLogin(browserSession);
-      
-      // Step 3: Perform authentication
-      const authResult = await this.performBrowserLogin(browserSession, loginPageData);
-      
-      // Step 4: Validate and store session
-      if (authResult.success && authResult.session) {
-        this.storeSession(authResult.session);
-        console.log('✅ Authentication successful, session stored');
+      if (httpResult.success) {
+        // Convert HTTP result to our session format
+        const authSession: AuthSession = {
+          cookies: httpResult.cookies || '',
+          sessionId: this.generateSessionId(),
+          expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+          isValid: true
+        };
+        
+        this.storeSession(authSession);
+        console.log('✅ HTTP fallback authentication successful');
+        
+        return {
+          success: true,
+          message: 'HTTP fallback authentication successful',
+          session: authSession,
+          debugInfo: {
+            method: 'http_fallback',
+            originalMethod: httpResult.method
+          }
+        };
       }
       
-      return authResult;
+      throw new Error('Both Puppeteer and HTTP authentication methods failed');
       
     } catch (error) {
-      console.error('❌ Headless authentication failed:', error);
+      console.error('❌ All authentication methods failed:', error);
       return {
         success: false,
         message: `Authentication failed: ${error.message}`,
@@ -79,357 +108,281 @@ export class HeadlessDWVAuth {
   }
 
   /**
-   * Initialize browser session with proper headers and state
+   * HTTP fallback authentication method
    */
-  private async initializeBrowserSession(): Promise<BrowserSession> {
-    console.log('🌐 Initializing browser session...');
-    
-    const session: BrowserSession = {
-      cookies: new Map(),
-      headers: new Map([
-        ['User-Agent', this.userAgent],
-        ['Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8'],
-        ['Accept-Language', 'pt-BR,pt;q=0.9,en;q=0.8'],
-        ['Accept-Encoding', 'gzip, deflate, br'],
-        ['Connection', 'keep-alive'],
-        ['Upgrade-Insecure-Requests', '1'],
-        ['Sec-Fetch-Dest', 'document'],
-        ['Sec-Fetch-Mode', 'navigate'],
-        ['Sec-Fetch-Site', 'none'],
-        ['Cache-Control', 'max-age=0']
-      ]),
-      sessionId: this.generateSessionId(),
-      lastActivity: new Date()
-    };
-
-    // Simulate browser initialization by visiting the main page first
-    await this.simulatePageVisit(session, this.baseUrl);
-    
-    console.log('✅ Browser session initialized');
-    return session;
+  private async performHttpFallback(): Promise<any> {
+    const enhancedAuth = createEnhancedAuth(this.credentials);
+    return await enhancedAuth.authenticate();
   }
 
   /**
-   * Navigate to login page and extract necessary data
+   * Perform authentication using Puppeteer browser automation
    */
-  private async navigateToLogin(session: BrowserSession): Promise<LoginPageData> {
-    console.log('📄 Navigating to login page...');
+  private async performPuppeteerLogin(): Promise<AuthResult> {
+    console.log('🌐 Attempting Puppeteer browser launch...');
     
-    const loginUrl = `${this.baseUrl}/login`;
-    
-    // Update headers for login page navigation
-    session.headers.set('Referer', this.baseUrl);
-    session.headers.set('Sec-Fetch-Site', 'same-origin');
-    
-    const response = await fetch(loginUrl, {
-      method: 'GET',
-      headers: Object.fromEntries(session.headers),
-      redirect: 'follow'
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to access login page: ${response.status} ${response.statusText}`);
-    }
-
-    // Update session cookies
-    this.updateSessionCookies(session, response);
-    
-    const html = await response.text();
-    
-    // Extract login form data
-    const formData = this.extractLoginFormData(html);
-    
-    console.log('✅ Login page loaded, form data extracted');
-    
-    return {
-      html,
-      formData,
-      url: loginUrl
-    };
-  }
-
-  /**
-   * Perform browser-like login with form submission
-   */
-  private async performBrowserLogin(
-    session: BrowserSession, 
-    loginData: LoginPageData
-  ): Promise<AuthResult> {
-    console.log('🔑 Performing browser login...');
-    
-    // Prepare form data
-    const formData = new URLSearchParams();
-    formData.append('email', this.credentials.email);
-    formData.append('password', this.credentials.password);
-    
-    // Add extracted form fields (CSRF tokens, etc.)
-    Object.entries(loginData.formData).forEach(([key, value]) => {
-      formData.append(key, value);
-    });
-    
-    // Add common form fields
-    formData.append('remember', '1');
-    
-    // Update headers for form submission
-    session.headers.set('Content-Type', 'application/x-www-form-urlencoded');
-    session.headers.set('Origin', this.baseUrl);
-    session.headers.set('Referer', loginData.url);
-    session.headers.set('Sec-Fetch-Dest', 'document');
-    session.headers.set('Sec-Fetch-Mode', 'navigate');
-    session.headers.set('Sec-Fetch-Site', 'same-origin');
-    
-    // Add current cookies to request
-    const cookieHeader = this.buildCookieHeader(session);
-    if (cookieHeader) {
-      session.headers.set('Cookie', cookieHeader);
+    // Try to dynamically import Puppeteer
+    let puppeteer: any;
+    try {
+      puppeteer = await import('https://esm.sh/puppeteer-core@19.11.1');
+    } catch (importError) {
+      throw new Error(`Puppeteer import failed: ${importError.message}`);
     }
     
-    const response = await fetch(loginData.url, {
-      method: 'POST',
-      headers: Object.fromEntries(session.headers),
-      body: formData.toString(),
-      redirect: 'manual'
-    });
+    let browser: any = null;
+    let page: any = null;
 
-    // Update session cookies
-    this.updateSessionCookies(session, response);
-    
-    const location = response.headers.get('location') || '';
-    
-    console.log(`📊 Login response: Status ${response.status}, Location: ${location}`);
-    
-    // Analyze response
-    if (response.status === 302) {
-      if (this.isSuccessfulRedirect(location)) {
-        // Follow redirect to complete login
-        const finalSession = await this.followRedirect(session, location);
-        
-        // Validate session
-        const isValid = await this.validateSession(finalSession);
-        
-        if (isValid) {
-          const authSession: AuthSession = {
-            cookies: this.buildCookieHeader(finalSession),
-            sessionId: finalSession.sessionId,
-            expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-            isValid: true
-          };
-          
-          return {
-            success: true,
-            message: 'Browser login successful',
-            session: authSession
-          };
-        } else {
-          throw new Error('Login appeared successful but session validation failed');
-        }
-      } else {
-        throw new Error(`Login failed - redirected to: ${location}`);
-      }
-    } else if (response.status === 200) {
-      // Check response content
-      const responseText = await response.text();
+    try {
+      // Launch browser with settings optimized for Supabase Edge Functions (serverless)
+      browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process',
+          '--disable-gpu',
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+          '--memory-pressure-off',
+          '--max_old_space_size=4096'
+        ],
+        // Optimize for serverless environment
+        timeout: 30000,
+        protocolTimeout: 30000
+      });
+
+      page = await browser.newPage();
       
-      if (this.containsSuccessIndicators(responseText)) {
+      // Set viewport and user agent
+      await page.setViewport({ width: 1280, height: 720 });
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+      console.log('📄 Navigating to login page...');
+      
+      // Navigate to login page
+      await page.goto(`${this.baseUrl}/login`, {
+        waitUntil: 'networkidle2',
+        timeout: 30000
+      });
+
+      console.log('🔍 Waiting for login form elements...');
+      
+      // Wait for form elements to be present (React app needs time to load)
+      await page.waitForSelector('input[name="username"], input[id="email"]', { timeout: 15000 });
+      await page.waitForSelector('input[name="password"], input[id="password"]', { timeout: 15000 });
+      await page.waitForSelector('button[type="submit"], button:contains("Entrar")', { timeout: 15000 });
+
+      console.log('✍️ Filling login form...');
+      
+      // Fill in credentials - try different field selectors
+      const emailFilled = await this.fillEmailField(page);
+      const passwordFilled = await this.fillPasswordField(page);
+      
+      if (!emailFilled || !passwordFilled) {
+        throw new Error('Could not fill login form fields');
+      }
+
+      console.log('🔑 Submitting login form...');
+      
+      // Submit form and wait for navigation
+      const submitButton = await page.$('button[type="submit"]') ||
+                           await page.$('button:contains("Entrar")') ||
+                           await page.$('.css-4ujxrj'); // The specific button class we found
+      
+      if (!submitButton) {
+        throw new Error('Could not find submit button');
+      }
+
+      // Click submit and wait for navigation
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }),
+        submitButton.click()
+      ]);
+
+      console.log('📊 Analyzing authentication result...');
+      
+      // Check current URL to determine success
+      const currentUrl = page.url();
+      console.log('🔍 Current URL after login:', currentUrl);
+      
+      // Check for success indicators
+      if (this.isSuccessfulUrl(currentUrl)) {
+        console.log('✅ Login successful - extracting session...');
+        
+        // Extract cookies for session
+        const cookies = await page.cookies();
+        const cookieString = cookies
+          .map(cookie => `${cookie.name}=${cookie.value}`)
+          .join('; ');
+
+        // Create session
         const authSession: AuthSession = {
-          cookies: this.buildCookieHeader(session),
-          sessionId: session.sessionId,
-          expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          cookies: cookieString,
+          sessionId: this.generateSessionId(),
+          expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
           isValid: true
         };
-        
+
         return {
           success: true,
-          message: 'Browser login successful (200 response)',
-          session: authSession
+          message: 'Puppeteer authentication successful',
+          session: authSession,
+          debugInfo: {
+            finalUrl: currentUrl,
+            cookieCount: cookies.length
+          }
         };
       } else {
-        const errorMessage = this.extractErrorMessage(responseText);
-        throw new Error(errorMessage || 'Login failed - no success indicators found');
+        // Check for error messages on the page
+        const errorMessage = await this.extractErrorMessage(page);
+        throw new Error(errorMessage || `Login failed - redirected to: ${currentUrl}`);
       }
-    } else {
-      throw new Error(`Unexpected login response: ${response.status} ${response.statusText}`);
+
+    } finally {
+      // Always cleanup browser resources - critical for serverless environment
+      if (page) {
+        try {
+          await page.close();
+          console.log('✅ Page closed successfully');
+        } catch (e) {
+          console.warn('⚠️ Warning: Could not close page:', e);
+        }
+      }
+      
+      if (browser) {
+        try {
+          await browser.close();
+          console.log('✅ Browser closed successfully');
+        } catch (e) {
+          console.warn('⚠️ Warning: Could not close browser:', e);
+        }
+      }
+      
+      // Force garbage collection if available (helps in serverless)
+      if (typeof globalThis.gc === 'function') {
+        try {
+          globalThis.gc();
+        } catch (e) {
+          // Ignore gc errors
+        }
+      }
     }
   }
 
   /**
-   * Follow redirect after successful login
+   * Fill email field with multiple selector strategies
    */
-  private async followRedirect(session: BrowserSession, location: string): Promise<BrowserSession> {
-    console.log(`🔄 Following redirect to: ${location}`);
-    
-    const redirectUrl = location.startsWith('/') ? `${this.baseUrl}${location}` : location;
-    
-    // Update headers for redirect
-    session.headers.set('Referer', `${this.baseUrl}/login`);
-    session.headers.delete('Content-Type');
-    
-    const cookieHeader = this.buildCookieHeader(session);
-    if (cookieHeader) {
-      session.headers.set('Cookie', cookieHeader);
-    }
-    
-    const response = await fetch(redirectUrl, {
-      method: 'GET',
-      headers: Object.fromEntries(session.headers),
-      redirect: 'follow'
-    });
-    
-    // Update session cookies
-    this.updateSessionCookies(session, response);
-    
-    return session;
-  }
-
-  /**
-   * Validate session by testing protected endpoints
-   */
-  private async validateSession(session: BrowserSession): Promise<boolean> {
-    console.log('✅ Validating session...');
-    
-    const testEndpoints = [
-      '/dashboard',
-      '/imoveis',
-      '/api/user',
-      '/profile'
+  private async fillEmailField(page: any): Promise<boolean> {
+    const selectors = [
+      'input[name="username"]',
+      'input[id="email"]',
+      'input[name="email"]',
+      'input[type="email"]',
+      'input[placeholder*="email" i]',
+      'input[placeholder*="telefone" i]'
     ];
 
-    for (const endpoint of testEndpoints) {
+    for (const selector of selectors) {
       try {
-        const testUrl = `${this.baseUrl}${endpoint}`;
-        const cookieHeader = this.buildCookieHeader(session);
-        
-        const response = await fetch(testUrl, {
-          method: 'GET',
-          headers: {
-            'User-Agent': this.userAgent,
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Cookie': cookieHeader || '',
-            'Referer': `${this.baseUrl}/dashboard`
-          },
-          redirect: 'manual'
-        });
-
-        if (response.ok) {
-          console.log(`✅ Session validated via ${endpoint}`);
+        const element = await page.$(selector);
+        if (element) {
+          await element.click();
+          await element.type(this.credentials.email, { delay: 100 });
+          console.log(`✅ Email filled using selector: ${selector}`);
           return true;
         }
-        
-        if (response.status === 302) {
-          const location = response.headers.get('location') || '';
-          if (!location.includes('login')) {
-            console.log(`✅ Session validated via redirect from ${endpoint}`);
-            return true;
-          }
-        }
-        
       } catch (error) {
-        console.error(`Session validation failed for ${endpoint}:`, error);
+        console.log(`❌ Failed to fill email with selector ${selector}:`, error.message);
       }
     }
 
-    console.log('❌ Session validation failed');
     return false;
   }
 
   /**
-   * Helper methods
+   * Fill password field with multiple selector strategies
    */
-  private simulatePageVisit(session: BrowserSession, url: string): Promise<void> {
-    // Simulate browser behavior by adding a small delay
-    return new Promise(resolve => setTimeout(resolve, 1000));
-  }
+  private async fillPasswordField(page: any): Promise<boolean> {
+    const selectors = [
+      'input[name="password"]',
+      'input[id="password"]',
+      'input[type="password"]',
+      'input[placeholder*="senha" i]'
+    ];
 
-  private updateSessionCookies(session: BrowserSession, response: Response): void {
-    const setCookieHeader = response.headers.get('set-cookie');
-    if (setCookieHeader) {
-      const cookies = setCookieHeader.split(',');
-      cookies.forEach(cookie => {
-        const [nameValue] = cookie.split(';');
-        const [name, value] = nameValue.split('=');
-        if (name && value) {
-          session.cookies.set(name.trim(), value.trim());
+    for (const selector of selectors) {
+      try {
+        const element = await page.$(selector);
+        if (element) {
+          await element.click();
+          await element.type(this.credentials.password, { delay: 100 });
+          console.log(`✅ Password filled using selector: ${selector}`);
+          return true;
         }
-      });
-    }
-  }
-
-  private buildCookieHeader(session: BrowserSession): string {
-    const cookies: string[] = [];
-    session.cookies.forEach((value, name) => {
-      cookies.push(`${name}=${value}`);
-    });
-    return cookies.join('; ');
-  }
-
-  private extractLoginFormData(html: string): Record<string, string> {
-    const formData: Record<string, string> = {};
-
-    // Extract CSRF tokens
-    const csrfPatterns = [
-      /name="_token"\s+value="([^"]+)"/i,
-      /name="csrf_token"\s+value="([^"]+)"/i,
-      /<meta\s+name="csrf-token"\s+content="([^"]+)"/i
-    ];
-
-    for (const pattern of csrfPatterns) {
-      const match = html.match(pattern);
-      if (match) {
-        formData._token = match[1];
-        formData.csrf_token = match[1];
-        break;
+      } catch (error) {
+        console.log(`❌ Failed to fill password with selector ${selector}:`, error.message);
       }
     }
 
-    // Extract other hidden fields
-    const hiddenFieldPattern = /<input[^>]*type="hidden"[^>]*name="([^"]+)"[^>]*value="([^"]+)"/gi;
-    let match;
-    while ((match = hiddenFieldPattern.exec(html)) !== null) {
-      const [, name, value] = match;
-      if (!formData[name]) {
-        formData[name] = value;
+    return false;
+  }
+
+  /**
+   * Extract error message from page
+   */
+  private async extractErrorMessage(page: any): Promise<string | null> {
+    try {
+      const errorSelectors = [
+        '.alert-error',
+        '.error-message',
+        '[class*="error"]',
+        '[class*="alert"]'
+      ];
+
+      for (const selector of errorSelectors) {
+        const element = await page.$(selector);
+        if (element) {
+          const text = await element.textContent();
+          if (text && text.trim()) {
+            return text.trim();
+          }
+        }
       }
-    }
-
-    return formData;
-  }
-
-  private isSuccessfulRedirect(location: string): boolean {
-    if (!location) return false;
-    
-    const successPatterns = ['/dashboard', '/home', '/imoveis', '/painel', '/app'];
-    const failurePatterns = ['/login', '/signin', '/auth', 'error'];
-    
-    const locationLower = location.toLowerCase();
-    
-    if (failurePatterns.some(pattern => locationLower.includes(pattern))) {
-      return false;
-    }
-    
-    return successPatterns.some(pattern => locationLower.includes(pattern));
-  }
-
-  private containsSuccessIndicators(html: string): boolean {
-    const indicators = ['dashboard', 'logout', 'sair', 'bem-vindo', 'perfil'];
-    const htmlLower = html.toLowerCase();
-    return indicators.some(indicator => htmlLower.includes(indicator));
-  }
-
-  private extractErrorMessage(html: string): string | null {
-    const errorPatterns = [
-      /<div[^>]*class="[^"]*alert[^"]*error[^"]*"[^>]*>([^<]+)</i,
-      /<div[^>]*class="[^"]*error[^"]*"[^>]*>([^<]+)</i
-    ];
-
-    for (const pattern of errorPatterns) {
-      const match = html.match(pattern);
-      if (match) {
-        return match[1].trim();
-      }
+    } catch (error) {
+      console.warn('Could not extract error message:', error);
     }
 
     return null;
   }
+
+  /**
+   * Check if URL indicates successful authentication
+   */
+  private isSuccessfulUrl(url: string): boolean {
+    const successPatterns = ['/dashboard', '/home', '/imoveis', '/painel', '/app'];
+    const failurePatterns = ['/login', '/signin', '/sign-in', '/auth', 'error'];
+    
+    const urlLower = url.toLowerCase();
+    
+    // Check for failure patterns first
+    if (failurePatterns.some(pattern => urlLower.includes(pattern))) {
+      return false;
+    }
+    
+    // Check for success patterns
+    return successPatterns.some(pattern => urlLower.includes(pattern));
+  }
+
+  /**
+   * Helper methods for session management
+   */
 
   private generateSessionId(): string {
     return `dwv_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -455,19 +408,6 @@ export class HeadlessDWVAuth {
   }
 }
 
-// Supporting interfaces
-interface BrowserSession {
-  cookies: Map<string, string>;
-  headers: Map<string, string>;
-  sessionId: string;
-  lastActivity: Date;
-}
-
-interface LoginPageData {
-  html: string;
-  formData: Record<string, string>;
-  url: string;
-}
 
 /**
  * Create headless authentication instance

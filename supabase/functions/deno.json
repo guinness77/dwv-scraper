@@ -1,8 +1,15 @@
 {
   "compilerOptions": {
     "allowJs": true,
-    "lib": ["deno.window"],
-    "strict": true
+    "lib": ["deno.window", "dom", "dom.iterable"],
+    "strict": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "exactOptionalPropertyTypes": false,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": false
   },
   "lint": {
     "files": {
@@ -23,5 +30,9 @@
       "singleQuote": true
     }
   },
-  "importMap": "./import_map.json"
+  "importMap": "./import_map.json",
+  "tasks": {
+    "dev": "deno run --allow-net --allow-read --allow-write --allow-env --allow-run --allow-ffi --unstable",
+    "serve": "deno run --allow-net --allow-read --allow-write --allow-env --allow-run --allow-ffi --unstable"
+  }
 }
