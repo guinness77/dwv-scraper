@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DWV Supabase Authentication Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h1 class="text-3xl font-bold mb-2">DWV Supabase Authentication Demo</h1>
+            <p class="text-gray-600">This demo uses Supabase edge functions to authenticate with DWV and fetch data without CORS issues.</p>
+        </div>
+
+        <!-- Authentication Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4">Step 1: Authentication</h2>
+            <p class="text-sm text-gray-600 mb-4">Login will automatically fetch available properties after successful authentication.</p>
+            
+            <!-- Login Form -->
+            <div id="login-section" class="mb-4">
+                <form id="login-form" class="space-y-4">
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                        <input type="email" id="email" value="fer.scarduelli@gmail.com" 
+                               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                        <input type="password" id="password" value="dwv@junttus" 
+                               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <button type="submit" id="login-button" 
+                            class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        Login via Supabase Edge Function
+                    </button>
+                </form>
+            </div>
+
+            <!-- Authentication Status -->
+            <div id="auth-status" class="hidden">
+                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+                    <p class="font-bold">✅ Authenticated Successfully!</p>
+                    <p id="auth-message" class="text-sm mt-1"></p>
+                </div>
+                <button id="logout-button" class="mt-4 bg-red-500 text-white py-2 px-4 rounded-md hover:bg-red-600">
+                    Logout
+                </button>
+            </div>
+
+            <!-- Error Display -->
+            <div id="auth-error" class="hidden mt-4">
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                    <p class="font-bold">❌ Authentication Failed</p>
+                    <p id="auth-error-message" class="text-sm mt-1"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Fetching Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4">Step 2: Property Data</h2>
+            
+            <div id="fetch-section" class="hidden">
+                <p class="text-gray-600 mb-4">Properties are automatically fetched after login. You can also refresh the data:</p>
+                <button id="fetch-properties-button"
+                        class="bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                    Refresh Properties Data
+                </button>
+            </div>
+
+            <div id="fetch-disabled" class="text-gray-500">
+                <p>⚠️ Please authenticate first before fetching data.</p>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="loading" class="hidden mt-4">
+                <div class="flex items-center">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                    <span class="ml-3 text-gray-600">Loading...</span>
+                </div>
+            </div>
+
+            <!-- Properties Display -->
+            <div id="properties-section" class="hidden mt-6">
+                <h3 class="text-xl font-semibold mb-3">Properties Found:</h3>
+                <div id="properties-info" class="bg-gray-50 p-4 rounded-md mb-4">
+                    <p><strong>Total Properties:</strong> <span id="total-properties">0</span></p>
+                    <p><strong>Source:</strong> <span id="data-source">-</span></p>
+                    <p><strong>Auth Method:</strong> <span id="auth-method">-</span></p>
+                </div>
+                <div id="properties-list" class="space-y-4 max-h-96 overflow-y-auto">
+                    <!-- Properties will be displayed here -->
+                </div>
+            </div>
+
+            <!-- Fetch Error Display -->
+            <div id="fetch-error" class="hidden mt-4">
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                    <p class="font-bold">❌ Failed to Fetch Data</p>
+                    <p id="fetch-error-message" class="text-sm mt-1"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Debug Information -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-2xl font-bold mb-4">Debug Information</h2>
+            <div id="debug-info" class="bg-gray-50 p-4 rounded-md font-mono text-sm">
+                <p>Waiting for actions...</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/src/auth-supabase-demo.ts"></script>
+</body>
+</html>
