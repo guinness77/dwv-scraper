@@ -97,9 +97,9 @@ export class EnhancedDWVAuth {
     cookies: string;
     formAction: string;
   }> {
-    console.log('📄 Getting login page data...');
+    console.log('📄 Getting sign-in page data...');
     
-    const response = await fetch(`${this.baseUrl}/login`, {
+    const response = await fetch(`${this.baseUrl}/sign-in`, {
       headers: {
         'User-Agent': this.userAgent,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -195,22 +195,35 @@ export class EnhancedDWVAuth {
     console.log(`📊 Auth response: Status ${response.status}, Location: ${location}`);
     console.log(`📊 Response headers:`, Object.fromEntries(response.headers.entries()));
     
-    // Check for successful authentication - handle both 302 and 307 redirects
-    if (response.status === 302 || response.status === 307) {
-      if (this.isSuccessfulRedirect(location)) {
+    // Handle redirect responses (302 and 307) by following the location header
+    if ((response.status === 302 || response.status === 307) && location) {
+      const redirectUrl = location.startsWith('http') ? location : `${this.baseUrl}${location}`;
+      console.log(`➡️ Following redirect to ${redirectUrl}`);
+      const redirectResponse = await fetch(redirectUrl, {
+        method: 'GET',
+        headers: {
+          'User-Agent': this.userAgent,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Cookie': newCookies,
+          'Referer': loginUrl
+        },
+        redirect: 'manual'
+      });
+      const finalCookies = this.extractCookies(redirectResponse) || newCookies;
+      const finalText = await redirectResponse.text();
+      if (redirectResponse.ok && this.containsSuccessIndicators(finalText)) {
         return {
           success: true,
-          message: 'Authentication successful with redirect',
-          cookies: newCookies,
-          redirectLocation: location,
+          message: 'Authentication successful via redirect',
+          cookies: finalCookies,
           method: 'form_login'
         };
-      } else if (location.includes('login')) {
-        // Redirected back to login - likely failed
-        const responseText = await response.text();
-        const errorMessage = this.extractErrorMessage(responseText);
-        throw new Error(errorMessage || 'Login failed - redirected back to login page');
       }
+      if (redirectResponse.status === 302 || redirectResponse.status === 307) {
+        throw new Error(`Unexpected nested redirect: ${redirectResponse.status} ${redirectResponse.statusText}`);
+      }
+      const errorMessage = this.extractErrorMessage(finalText);
+      throw new Error(errorMessage || `Login failed after redirect: ${redirectResponse.status}`);
     }
     
     // Check response content for success indicators
