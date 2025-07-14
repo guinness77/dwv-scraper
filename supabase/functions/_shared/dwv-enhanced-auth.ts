@@ -163,6 +163,13 @@ export class EnhancedDWVAuth {
     
     const loginUrl = loginData.formAction || `${this.baseUrl}/login`;
     
+    console.log(`🔍 Login attempt details:`);
+    console.log(`  - URL: ${loginUrl}`);
+    console.log(`  - Email: ${this.credentials.email}`);
+    console.log(`  - CSRF Token: ${loginData.csrfToken ? 'Present' : 'Missing'}`);
+    console.log(`  - Form Data: ${formData.toString()}`);
+    console.log(`  - Cookies: ${loginData.cookies}`);
+    
     const response = await fetch(loginUrl, {
       method: 'POST',
       headers: {
@@ -186,9 +193,10 @@ export class EnhancedDWVAuth {
     const location = response.headers.get('location') || '';
     
     console.log(`📊 Auth response: Status ${response.status}, Location: ${location}`);
+    console.log(`📊 Response headers:`, Object.fromEntries(response.headers.entries()));
     
-    // Check for successful authentication
-    if (response.status === 302) {
+    // Check for successful authentication - handle both 302 and 307 redirects
+    if (response.status === 302 || response.status === 307) {
       if (this.isSuccessfulRedirect(location)) {
         return {
           success: true,

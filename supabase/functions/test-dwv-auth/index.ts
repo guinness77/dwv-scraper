@@ -19,12 +19,22 @@ Deno.serve(async (req: Request) => {
   try {
     console.log('🔐 Starting enhanced DWV authentication test...');
     console.log(`📧 Testing with email: ${DWV_CREDENTIALS.email}`);
+    console.log('🔍 DIAGNOSTIC: Using HeadlessDWVAuth with Puppeteer support');
+    console.log('🔍 DIAGNOSTIC: Import source - dwv-headless-auth.ts');
     
     // Create headless authentication manager (Hybrid Puppeteer + HTTP fallback)
     const authManager = createHeadlessAuth(DWV_CREDENTIALS);
+    console.log('🔍 DIAGNOSTIC: AuthManager created successfully');
     
     // Attempt authentication
+    console.log('🔍 DIAGNOSTIC: Starting authentication process...');
     const authResult = await authManager.authenticate();
+    console.log('🔍 DIAGNOSTIC: Authentication completed with result:', {
+      success: authResult.success,
+      message: authResult.message,
+      hasSession: !!authResult.session,
+      debugInfo: authResult.debugInfo
+    });
     
     // Log the result
     console.log(`Authentication result: ${authResult.success ? 'SUCCESS' : 'FAILED'}`);

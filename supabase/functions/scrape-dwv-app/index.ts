@@ -1,5 +1,5 @@
 import { corsHeaders } from '../_shared/cors.ts';
-import { createEnhancedAuth, DWVCredentials } from '../_shared/dwv-enhanced-auth.ts';
+import { createHeadlessAuth, DWVCredentials } from '../_shared/dwv-headless-auth.ts';
 import { createPropertyExtractor } from '../_shared/dwv-property-extractor.ts';
 
 // Get credentials from environment variables
@@ -23,18 +23,24 @@ Deno.serve(async (req: Request) => {
     
     // Step 1: Authenticate
     console.log('🔐 Authenticating with DWV App...');
-    const authManager = createEnhancedAuth(DWV_CREDENTIALS);
+    console.log('🔍 DIAGNOSTIC: Using HeadlessDWVAuth with Puppeteer support');
+    const authManager = createHeadlessAuth(DWV_CREDENTIALS);
     const authResult = await authManager.authenticate();
+    console.log('🔍 DIAGNOSTIC: Authentication method used:', authResult.debugInfo?.method || 'unknown');
     
     if (!authResult.success) {
       throw new Error(`Authentication failed: ${authResult.message}`);
     }
     
-    console.log(`✅ Authentication successful using method: ${authResult.method}`);
+    console.log(`✅ Authentication successful using method: ${authResult.debugInfo?.method || 'headless_auth'}`);
     
     // Step 2: Extract properties
     console.log('🔍 Starting property extraction...');
-    const extractor = createPropertyExtractor(authResult.cookies!);
+    const cookies = authResult.session?.cookies || '';
+    if (!cookies) {
+      throw new Error('No session cookies available for property extraction');
+    }
+    const extractor = createPropertyExtractor(cookies);
     const extractionResult = await extractor.extractProperties();
     
     if (!extractionResult.success) {
@@ -50,7 +56,7 @@ Deno.serve(async (req: Request) => {
       total_found: extractionResult.total_found,
       message: extractionResult.message,
       source: extractionResult.source,
-      auth_method: authResult.method,
+      auth_method: authResult.debugInfo?.method || 'headless_auth',
       timestamp: new Date().toISOString(),
       debug: {
         credentials_configured: !!(DWV_CREDENTIALS.email && DWV_CREDENTIALS.password),

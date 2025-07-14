@@ -121,6 +121,13 @@ export class HeadlessDWVAuth {
   private async performPuppeteerLogin(): Promise<AuthResult> {
     console.log('🌐 Attempting Puppeteer browser launch...');
     
+    // Check if we're in Supabase Edge Function environment
+    const isEdgeFunction = typeof Deno !== 'undefined' && Deno.env.get('SUPABASE_URL');
+    if (isEdgeFunction) {
+      console.log('⚠️ Puppeteer not supported in Supabase Edge Functions environment');
+      throw new Error('Puppeteer not supported in Edge Functions - browser binaries not available');
+    }
+    
     // Try to dynamically import Puppeteer
     let puppeteer: any;
     try {
